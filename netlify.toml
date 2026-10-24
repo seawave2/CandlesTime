@@ -1,0 +1,23 @@
+# Netlify configuration for Shabbat & Holiday Alerts PWA
+[build.processing]
+  skip_processing = true
+
+[context.production.environment]
+  NETLIFY_DRAWER = "false"
+
+# Cache policy
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"

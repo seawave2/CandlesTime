@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>התראות שבת ומועדים | לוח זמנים</title>
+  
+  <!-- Web Manifest & Mobile Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="icon.png">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            gold: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Fixed Schedule Dataset (2026-2028) -->
+  <script src="schedule_data.js"></script>
+
+  <!-- Trilingual Dictionary (HE, EN, RU) -->
+  <script src="locales.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      touch-action: manipulation;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .pulse-glow {
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-amber-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-lg">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold text-xl shadow-md shrink-0">
+          🕯️
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white truncate">
+            <span data-i18n="title">לוח זמנים והתראות</span>
+          </h1>
+          <p data-i18n="subtitle" class="text-xs text-amber-400 font-medium truncate">שבת ומועדים</p>
+        </div>
+      </div>
+      
+      <!-- Action Controls -->
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <!-- Settings Button -->
+        <button id="btnSettings" onclick="toggleSettingsModal(true)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition shadow-sm" title="Settings">
+          <i class="fa-solid fa-sliders text-base"></i>
+        </button>
+
+        <!-- Help Button -->
+        <button id="btnHelp" onclick="toggleHelpModal(true)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition shadow-sm" title="Help">
+          <i class="fa-solid fa-circle-question text-base"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-3xl mx-auto w-full px-4 py-5 flex-1 flex flex-col gap-5">
+    
+    <!-- Hero / Next Alert Card -->
+    <section id="heroCard" class="glass-card rounded-2xl p-5 border border-amber-500/30 pulse-glow relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20">
+      <div class="flex items-center justify-between mb-3">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span data-i18n="nextEventBadge">האירוע הקרוב ביותר</span>
+        </span>
+        <span id="nextAlertTimeOffsetBadge" class="text-xs text-slate-400 font-medium"></span>
+      </div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 id="nextEventTitle" class="text-2xl font-black text-amber-300 flex items-center gap-2"></h2>
+          <p id="nextEventDateStr" class="text-slate-300 text-sm mt-1 font-medium"></p>
+          <div class="mt-2 text-xs text-slate-400 flex items-center gap-2 flex-wrap">
+            <span>⏰ <span data-i18n="eventTimeLabel">שעת האירוע:</span> <strong id="nextEventTime" class="text-white text-sm">--:--</strong></span>
+            <span class="text-slate-600">•</span>
+            <span>🔔 <span data-i18n="alertScheduledLabel">התראה מתוכננת ל:</span> <strong id="nextAlertScheduledTime" class="text-amber-400 text-sm">--:--</strong></span>
+          </div>
+        </div>
+
+        <!-- Live Countdown Timer (Always LTR: Days -> Hours -> Minutes) -->
+        <div dir="ltr" class="bg-slate-950/70 rounded-xl p-3 border border-slate-800 flex items-center justify-around gap-3 text-center min-w-[200px] shrink-0">
+          <div>
+            <div id="cdDays" class="text-xl font-black text-amber-400">0</div>
+            <div data-i18n="days" class="text-[10px] text-slate-400 font-bold uppercase">ימים</div>
+          </div>
+          <div class="text-slate-600 font-bold">:</div>
+          <div>
+            <div id="cdHours" class="text-xl font-black text-amber-400">00</div>
+            <div data-i18n="hours" class="text-[10px] text-slate-400 font-bold uppercase">שעות</div>
+          </div>
+          <div class="text-slate-600 font-bold">:</div>
+          <div>
+            <div id="cdMinutes" class="text-xl font-black text-amber-400">00</div>
+            <div data-i18n="minutes" class="text-[10px] text-slate-400 font-bold uppercase">דקות</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Action Hub -->
+    <section>
+      <!-- Enable Notifications / Test Button -->
+      <button onclick="requestAndTestNotification()" class="w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r from-amber-600/30 to-emerald-600/30 hover:from-amber-600/40 hover:to-emerald-600/40 border border-amber-500/30 text-white font-bold shadow-md transition active:scale-98 text-start">
+        <div class="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center text-xl shrink-0">
+          🔔
+        </div>
+        <div class="min-w-0">
+          <div data-i18n="testAlertTitle" class="text-sm font-bold">הפעל ובדוק התראת טלפון עכשיו</div>
+          <div data-i18n="testAlertDesc" class="text-xs text-slate-300 mt-0.5">בדיקת צליל והתראת מערכת בטלפון</div>
+        </div>
+      </button>
+    </section>
+
+    <!-- Search, Filter & List -->
+    <section class="flex flex-col gap-3">
+      <div class="flex flex-col sm:flex-row gap-2 items-center justify-between">
+        <!-- Search bar -->
+        <div class="relative w-full sm:w-72">
+          <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="חיפוש לפי תאריך, יום או אירוע..." oninput="renderEventsList()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 px-8">
+          <i class="fa-solid fa-magnifying-glass absolute start-3 top-2.5 text-slate-500 text-sm"></i>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 w-full sm:w-auto overflow-x-auto">
+          <button onclick="setFilter('upcoming')" id="tab-upcoming" data-i18n="tabUpcoming" class="filter-tab px-3 py-1.5 rounded-lg text-xs font-medium transition bg-amber-500 text-slate-950 font-bold whitespace-nowrap">עתידיים</button>
+          <button onclick="setFilter('all')" id="tab-all" class="filter-tab px-3 py-1.5 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white whitespace-nowrap"><span data-i18n="tabAll">הכל</span> (<span id="countAll">0</span>)</button>
+          <button onclick="setFilter('entry')" id="tab-entry" data-i18n="tabEntry" class="filter-tab px-3 py-1.5 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white whitespace-nowrap">כניסת שבת/חג 🕯️</button>
+          <button onclick="setFilter('exit')" id="tab-exit" data-i18n="tabExit" class="filter-tab px-3 py-1.5 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white whitespace-nowrap">צאת שבת/חג ✨</button>
+        </div>
+      </div>
+
+      <!-- Events List -->
+      <div id="eventsListContainer" class="flex flex-col gap-2.5">
+        <!-- Event cards injected by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Settings Modal (Compact & No Scroll Needed) -->
+  <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm sm:max-w-md w-full p-4 shadow-2xl flex flex-col gap-2.5 text-start">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+          <i class="fa-solid fa-sliders text-amber-400"></i>
+          <span data-i18n="settingsTitle">הגדרות התראה ותזמון</span>
+        </h3>
+        <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Alert Target Mode (Entry, Exit, Both) -->
+      <div class="space-y-1">
+        <label data-i18n="alertModeTitle" class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <i class="fa-solid fa-bell text-amber-400 text-[11px]"></i>
+          איזה מועדים יקבלו התראה?
+        </label>
+        <div class="grid grid-cols-3 gap-1.5 text-xs">
+          <button type="button" onclick="setAlertMode('entry')" class="alert-mode-btn py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-mode="entry">
+            <span>🕯️</span> <span data-i18n="alertModeEntry" class="truncate font-medium">כניסה בלבד</span>
+          </button>
+          <button type="button" onclick="setAlertMode('exit')" class="alert-mode-btn py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-mode="exit">
+            <span>✨</span> <span data-i18n="alertModeExit" class="truncate font-medium">יציאה בלבד</span>
+          </button>
+          <button type="button" onclick="setAlertMode('both')" class="alert-mode-btn py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-mode="both">
+            <span>🕯️✨</span> <span data-i18n="alertModeBoth" class="truncate font-medium">שניהם</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Advance notification timing -->
+      <div class="space-y-1.5">
+        <label data-i18n="alertTimeQuestion" class="text-xs font-semibold text-slate-300 block">מתי להשמיע ולהציג את ההתראה?</label>
+        <div class="grid grid-cols-3 gap-1.5 text-[11px]">
+          <button type="button" onclick="setPresetOffset(0)" class="offset-btn py-1 px-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 truncate" data-offset="0" data-i18n="offsetExact">בזמן (0 דק')</button>
+          <button type="button" onclick="setPresetOffset(10)" class="offset-btn py-1 px-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 truncate" data-offset="10" data-i18n="offset10">10 דקות</button>
+          <button type="button" onclick="setPresetOffset(15)" class="offset-btn py-1 px-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 truncate" data-offset="15" data-i18n="offset15">15 דקות</button>
+          <button type="button" onclick="setPresetOffset(20)" class="offset-btn py-1 px-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 truncate" data-offset="20" data-i18n="offset20">20 דקות</button>
+          <button type="button" onclick="setPresetOffset(30)" class="offset-btn py-1 px-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 truncate" data-offset="30" data-i18n="offset30">30 דקות</button>
+          <button type="button" onclick="setPresetOffset(60)" class="offset-btn py-1 px-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 truncate" data-offset="60" data-i18n="offset60">שעה (60)</button>
+        </div>
+
+        <div class="flex items-center gap-2 pt-0.5 text-xs text-slate-400">
+          <span data-i18n="customOffsetPrompt" class="text-[11px]">או מותאם אישית:</span>
+          <input type="number" id="customOffsetInput" min="0" max="1440" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-0.5 text-xs text-white w-16 text-center" oninput="handleCustomOffsetChange(this.value)">
+          <span data-i18n="minutesBeforeLabel" class="text-[11px]">דק' מראש</span>
+        </div>
+      </div>
+
+      <!-- Double alert & Sound rows (2 columns) -->
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800">
+          <span data-i18n="doubleAlertTitle" class="text-xs font-semibold text-white">התראה כפולה</span>
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input type="checkbox" id="doubleAlertToggle" class="sr-only peer" onchange="saveSettings()">
+            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+          </label>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800">
+          <span data-i18n="soundTitle" class="text-xs font-semibold text-white">צליל תזכורת</span>
+          <button onclick="playChimeSound()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-medium flex items-center gap-1 shrink-0">
+            <i class="fa-solid fa-volume-high text-[11px]"></i> <span data-i18n="btnPlay">השמע</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Font Size Selector -->
+      <div class="space-y-1">
+        <label data-i18n="fontSizeTitle" class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <i class="fa-solid fa-font text-amber-400 text-[11px]"></i>
+          גודל כתב
+        </label>
+        <div class="grid grid-cols-3 gap-1.5 text-xs">
+          <button type="button" onclick="setFontSize('normal')" class="font-size-btn py-1 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-size="normal">
+            <span class="text-xs font-bold">A</span>
+            <span data-i18n="fontSizeNormal" class="truncate font-medium">רגיל</span>
+          </button>
+          <button type="button" onclick="setFontSize('large')" class="font-size-btn py-1 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-size="large">
+            <span class="text-sm font-bold">A+</span>
+            <span data-i18n="fontSizeLarge" class="truncate font-medium">גדול</span>
+          </button>
+          <button type="button" onclick="setFontSize('xlarge')" class="font-size-btn py-1 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-size="xlarge">
+            <span class="text-base font-bold">A++</span>
+            <span data-i18n="fontSizeXLarge" class="truncate font-medium">גדול מאוד</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Language Switcher Section (Bottom Row) -->
+      <div class="pt-2 border-t border-slate-800 space-y-1">
+        <label data-i18n="langSectionTitle" class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <i class="fa-solid fa-globe text-amber-400 text-[11px]"></i>
+          שפת ממשק / Language / Язык
+        </label>
+        <div class="grid grid-cols-3 gap-1.5 text-xs">
+          <button type="button" onclick="setLanguage('he')" class="lang-btn py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-lang="he">
+            <span>🇮🇱</span> <span>עברית</span>
+          </button>
+          <button type="button" onclick="setLanguage('en')" class="lang-btn py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-lang="en">
+            <span>🇺🇸</span> <span>English</span>
+          </button>
+          <button type="button" onclick="setLanguage('ru')" class="lang-btn py-1.5 px-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 flex items-center justify-center gap-1 transition active:scale-95" data-lang="ru">
+            <span>🇷🇺</span> <span>Русский</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer Button -->
+      <div class="pt-1 flex items-center justify-end">
+        <button onclick="toggleSettingsModal(false)" data-i18n="btnSaveClose" class="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition active:scale-95">
+          שמור וסגור
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help & Android Guide Modal -->
+  <div id="helpModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 shadow-2xl flex flex-col gap-4 text-start">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-mobile-screen-button text-amber-400"></i>
+          <span data-i18n="helpTitle">איך לקבל התראות באנדרואיד בצורה מושלמת?</span>
+        </h3>
+        <button onclick="toggleHelpModal(false)" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-300 leading-relaxed max-h-[70vh] overflow-y-auto pl-1 pr-1">
+        <!-- Method 1: Sync to Calendar -->
+        <div class="p-3.5 rounded-xl bg-blue-950/40 border border-blue-800/40 space-y-2.5">
+          <h4 data-i18n="helpMethod1Title" class="font-bold text-blue-300 text-sm mb-1">🌟 השיטה האמינה ביותר: סנכרון ליומן של הטלפון</h4>
+          <p data-i18n="helpMethod1Desc">
+            מערכת אנדרואיד משביתה לעיתים אפליקציות ברקע כדי לחסוך בסוללה.  
+            לכן, לחץ על הכפתור "סנכרן ליומן הטלפון" למטה – הקובץ שירד ייפתח ביומן Google / לוח השנה שלך ויוסיף את כל 228 המועדים עם צלצול והתראת מסך נעילה ב-100% דיוק, גם כשהטלפון כבוי לחלוטין!
+          </p>
+          <button onclick="exportToCalendarICS()" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition active:scale-98">
+            <span class="text-sm">📅</span>
+            <span data-i18n="syncCalendarTitle">סנכרן ליומן הטלפון (Google Calendar)</span>
+          </button>
+        </div>
+
+        <!-- Method 2: Prevent App Sleep & Samsung Focus -->
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+          <h4 data-i18n="helpMethod2Title" class="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-battery-three-quarters text-emerald-400"></i>
+            ⚡ שיטה 2: הפעלת האפליקציה ברקע ללא סגירה (Samsung / אנדרואיד)
+          </h4>
+          <p data-i18n="batteryOptDesc" class="text-slate-400 text-[11px] leading-tight">
+            כדי שההתראות יצלצלו תמיד ברקע גם כשהמסך כבוי:
+          </p>
+          
+          <!-- Direct intent launch button -->
+          <a href="intent:#Intent;action=android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS;end;" onclick="handleOpenBatterySettings(event)" class="w-full py-2 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-98">
+            <i class="fa-solid fa-bolt text-emerald-400"></i>
+            <span data-i18n="btnOpenBatterySettings">פתח הגדרות סוללה במכשיר ⚡</span>
+          </a>
+
+          <!-- Samsung Galaxy specific focus guide -->
+          <div class="pt-2 border-t border-slate-800/80 space-y-1.5 text-slate-300">
+            <div data-i18n="samsungStepsTitle" class="font-bold text-amber-400 flex items-center gap-1.5">
+              <i class="fa-brands fa-android"></i>
+              התמקדות בסמסונג (Samsung Galaxy):
+            </div>
+            <div data-i18n="samsungStep1" class="text-slate-300">1. הגדרת סוללה: הגדרות > יישומים > Chrome > סוללה > בחר "ללא הגבלה" (Unrestricted).</div>
+            <div data-i18n="samsungStep2" class="text-slate-300">2. מניעת שינה: הגדרות > טיפול בסוללה ובמכשיר > סוללה > מגבלות שימוש ברקע > הוסף ל"אפליקציות שלעולם אינן במצב שינה".</div>
+            <div data-i18n="samsungStep3" class="text-slate-300">3. נעילה בזיכרון: פתח יישומים אחרונים (Recent Apps) ולחץ על סמל המנעול 🔒 לשמירה קבועה.</div>
+            <div data-i18n="otherAndroidNote" class="text-[10px] text-slate-400 pt-0.5">במכשירי אנדרואיד אחרים: הגדרות > יישומים > Chrome > סוללה > ללא הגבלה.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end border-t border-slate-800">
+        <button onclick="toggleHelpModal(false)" data-i18n="btnCloseHelp" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs">
+          הבנתי, תודה
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-semibold shadow-2xl transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+    <i id="toastIcon" class="fa-solid fa-check"></i>
+    <span id="toastMessage">הודעה</span>
+  </div>
+
+  <!-- App Logic Script -->
+  <script>
+    // State
+    let events = (typeof FIXED_SCHEDULE !== 'undefined') ? FIXED_SCHEDULE : [];
+    let currentFilter = 'upcoming';
+    let currentLang = 'he';
+    let appSettings = {
+      lang: 'he',
+      alertMode: 'entry', // 'entry' (default) | 'both' | 'exit'
+      fontSize: 'large', // 'large' (default) | 'normal' | 'xlarge'
+      offsetMinutes: 15, // Default 15 minutes before
+      doubleAlert: true, // Also alert at exact time
+      sound: true
+    };
+
+    // Load initial settings and events
+    function init() {
+      loadSettings();
+      currentLang = appSettings.lang || 'he';
+      events = (typeof FIXED_SCHEDULE !== 'undefined') ? FIXED_SCHEDULE : [];
+
+      applyFontSize(appSettings.fontSize || 'large');
+      applyLanguage(currentLang);
+      renderSettingsUI();
+      renderEventsList();
+      updateHeroNextEvent();
+      setInterval(updateHeroNextEvent, 1000); // 1s tick for countdown
+
+      // Register Service Worker for PWA
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(console.warn);
+      }
+    }
+
+    // --- Language & Internationalization ---
+    function t(key, params = {}) {
+      const dict = I18N[currentLang] || I18N.he;
+      let text = dict[key] || (I18N.he[key] || key);
+      for (const [k, v] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+      }
+      return text;
+    }
+
+    function setLanguage(lang) {
+      if (!I18N[lang]) return;
+      currentLang = lang;
+      appSettings.lang = lang;
+      localStorage.setItem('shabbat_app_lang', lang);
+      saveSettings(false);
+      applyLanguage(lang);
+    }
+
+    function cycleLanguage() {
+      const langs = ['he', 'en', 'ru'];
+      const nextIdx = (langs.indexOf(currentLang) + 1) % langs.length;
+      setLanguage(langs[nextIdx]);
+    }
+
+    function applyLanguage(lang) {
+      const dict = I18N[lang] || I18N.he;
+      document.documentElement.lang = lang;
+      document.documentElement.dir = dict.dir;
+
+      // Update text in elements with data-i18n
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.innerText = dict[key];
+        }
+      });
+
+      // Update placeholders
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (dict[key]) {
+          el.placeholder = dict[key];
+        }
+      });
+
+      // Update Header language pill
+      const flagLabels = {
+        he: '🇮🇱 עברית',
+        en: '🇺🇸 English',
+        ru: '🇷🇺 Русский'
+      };
+      const quickLabel = document.getElementById('currentLangLabel');
+      if (quickLabel) quickLabel.innerText = flagLabels[lang] || lang.toUpperCase();
+
+      // Highlight active button in settings modal
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        if (btn.getAttribute('data-lang') === lang) {
+          btn.classList.add('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.remove('bg-slate-800', 'text-slate-200');
+        } else {
+          btn.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.add('bg-slate-800', 'text-slate-200');
+        }
+      });
+
+      renderEventsList();
+      updateHeroNextEvent();
+    }
+
+    // Localized title for an event
+    function getLocalizedTitle(evt) {
+      if (evt.customTitle) return evt.customTitle;
+      const dict = I18N[currentLang] || I18N.he;
+      if (evt.subType === 'shabbat') {
+        return evt.type === 'entry' ? dict.shabbatEntry : dict.shabbatExit;
+      } else {
+        return evt.type === 'entry' ? dict.holidayEntry : dict.holidayExit;
+      }
+    }
+
+    // Localized day name
+    function getLocalizedDayName(evt) {
+      const dict = I18N[currentLang] || I18N.he;
+      const daysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayEn = evt.dayEn || daysEn[new Date(evt.timestamp).getDay()];
+      return dict.daysNames[dayEn] || dayEn;
+    }
+
+    // Localized date formatting
+    function formatLocalizedDate(ts) {
+      const locales = { he: 'he-IL', en: 'en-US', ru: 'ru-RU' };
+      const loc = locales[currentLang] || 'he-IL';
+      const d = new Date(ts);
+      return d.toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    // --- Storage & Settings ---
+    function loadSettings() {
+      const savedLang = localStorage.getItem('shabbat_app_lang');
+      if (savedLang && I18N[savedLang]) {
+        appSettings.lang = savedLang;
+      }
+      const saved = localStorage.getItem('shabbat_app_settings');
+      if (saved) {
+        try {
+          appSettings = { ...appSettings, ...JSON.parse(saved) };
+        } catch(e) {}
+      }
+      if (!appSettings.alertMode || !localStorage.getItem('shabbat_alert_mode_set')) {
+        appSettings.alertMode = 'entry';
+      }
+      const savedFontSize = localStorage.getItem('shabbat_font_size');
+      if (savedFontSize) {
+        appSettings.fontSize = savedFontSize;
+      } else {
+        appSettings.fontSize = 'large';
+      }
+      if (!appSettings.fontSize) appSettings.fontSize = 'large';
+    }
+
+    function saveSettings(showToastMsg = true) {
+      appSettings.doubleAlert = document.getElementById('doubleAlertToggle').checked;
+      localStorage.setItem('shabbat_app_settings', JSON.stringify(appSettings));
+      updateHeroNextEvent();
+      if (showToastMsg) {
+        showToast(t('toastSettingsSaved'));
+      }
+    }
+
+    function renderSettingsUI() {
+      document.getElementById('doubleAlertToggle').checked = !!appSettings.doubleAlert;
+      document.getElementById('customOffsetInput').value = appSettings.offsetMinutes;
+      highlightOffsetBtn(appSettings.offsetMinutes);
+      highlightAlertModeBtn(appSettings.alertMode || 'entry');
+      highlightFontSizeBtn(appSettings.fontSize || 'large');
+    }
+
+    function setFontSize(size) {
+      appSettings.fontSize = size;
+      localStorage.setItem('shabbat_font_size', size);
+      applyFontSize(size);
+      highlightFontSizeBtn(size);
+      saveSettings(false);
+    }
+
+    function applyFontSize(size) {
+      const root = document.documentElement;
+      root.classList.remove('font-size-normal', 'font-size-large', 'font-size-xlarge');
+      root.classList.add(`font-size-${size}`);
+
+      if (size === 'large') {
+        root.style.fontSize = '18px';
+      } else if (size === 'xlarge') {
+        root.style.fontSize = '20px';
+      } else {
+        root.style.fontSize = '16px';
+      }
+    }
+
+    function highlightFontSizeBtn(size) {
+      document.querySelectorAll('.font-size-btn').forEach(btn => {
+        if (btn.getAttribute('data-size') === size) {
+          btn.classList.add('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.remove('bg-slate-800', 'text-slate-200');
+        } else {
+          btn.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.add('bg-slate-800', 'text-slate-200');
+        }
+      });
+    }
+
+    function highlightAlertModeBtn(mode) {
+      document.querySelectorAll('.alert-mode-btn').forEach(btn => {
+        if (btn.getAttribute('data-mode') === mode) {
+          btn.classList.add('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.remove('bg-slate-800', 'text-slate-200');
+        } else {
+          btn.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.add('bg-slate-800', 'text-slate-200');
+        }
+      });
+    }
+
+    function setAlertMode(mode) {
+      appSettings.alertMode = mode;
+      localStorage.setItem('shabbat_alert_mode_set', 'true');
+      highlightAlertModeBtn(mode);
+      saveSettings(false);
+      renderEventsList();
+      updateHeroNextEvent();
+    }
+
+    function highlightOffsetBtn(val) {
+      document.querySelectorAll('.offset-btn').forEach(btn => {
+        if (parseInt(btn.getAttribute('data-offset'), 10) === val) {
+          btn.classList.add('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.remove('bg-slate-800', 'text-slate-200');
+        } else {
+          btn.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold', 'border-amber-400');
+          btn.classList.add('bg-slate-800', 'text-slate-200');
+        }
+      });
+    }
+
+    function setPresetOffset(minutes) {
+      appSettings.offsetMinutes = minutes;
+      document.getElementById('customOffsetInput').value = minutes;
+      highlightOffsetBtn(minutes);
+      saveSettings();
+    }
+
+    function handleCustomOffsetChange(val) {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed) && parsed >= 0) {
+        appSettings.offsetMinutes = parsed;
+        highlightOffsetBtn(parsed);
+        saveSettings();
+      }
+    }
+
+    // --- Next Event & Countdown Calculation ---
+    function updateHeroNextEvent() {
+      const now = Date.now();
+      
+      const upcoming = events.filter(e => {
+        if (appSettings.alertMode === 'entry' && e.type !== 'entry') return false;
+        if (appSettings.alertMode === 'exit' && e.type !== 'exit') return false;
+        const alertTime = e.timestamp - (appSettings.offsetMinutes * 60 * 1000);
+        return alertTime > now || e.timestamp > now;
+      });
+
+      if (upcoming.length === 0) {
+        document.getElementById('nextEventTitle').innerText = t('allPassed');
+        document.getElementById('nextEventDateStr').innerText = t('uploadNewTip');
+        document.getElementById('nextEventTime').innerText = '--:--';
+        document.getElementById('nextAlertScheduledTime').innerText = '--:--';
+        setCountdown(0, 0, 0);
+        return;
+      }
+
+      const nextEvt = upcoming[0];
+      const alertTimestamp = nextEvt.timestamp - (appSettings.offsetMinutes * 60 * 1000);
+      const targetTime = alertTimestamp > now ? alertTimestamp : nextEvt.timestamp;
+
+      document.getElementById('nextEventTitle').innerText = getLocalizedTitle(nextEvt);
+      document.getElementById('nextEventDateStr').innerText = `${getLocalizedDayName(nextEvt)}, ${formatLocalizedDate(nextEvt.timestamp)}`;
+      document.getElementById('nextEventTime').innerText = nextEvt.timeString;
+      
+      const alertDate = new Date(alertTimestamp);
+      const locales = { he: 'he-IL', en: 'en-US', ru: 'ru-RU' };
+      const alertTimeStr = alertDate.toLocaleTimeString(locales[currentLang] || 'he-IL', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('nextAlertScheduledTime').innerText = alertTimeStr;
+
+      if (appSettings.offsetMinutes > 0) {
+        document.getElementById('nextAlertTimeOffsetBadge').innerText = t('timingBefore', { n: appSettings.offsetMinutes });
+      } else {
+        document.getElementById('nextAlertTimeOffsetBadge').innerText = t('timingExact');
+      }
+
+      // Countdown
+      const diffMs = Math.max(0, targetTime - now);
+      const totalSec = Math.floor(diffMs / 1000);
+      const days = Math.floor(totalSec / (3600 * 24));
+      const hours = Math.floor((totalSec % (3600 * 24)) / 3600);
+      const minutes = Math.floor((totalSec % 3600) / 60);
+
+      setCountdown(days, hours, minutes);
+
+      // Check alert trigger right now
+      if (Math.abs(alertTimestamp - now) < 1500) {
+        triggerActiveAlert(nextEvt, false);
+      } else if (appSettings.doubleAlert && Math.abs(nextEvt.timestamp - now) < 1500) {
+        triggerActiveAlert(nextEvt, true);
+      }
+    }
+
+    function setCountdown(d, h, m) {
+      document.getElementById('cdDays').innerText = d;
+      document.getElementById('cdHours').innerText = String(h).padStart(2, '0');
+      document.getElementById('cdMinutes').innerText = String(m).padStart(2, '0');
+    }
+
+    // --- Render Events List ---
+    function renderEventsList() {
+      const container = document.getElementById('eventsListContainer');
+      const search = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      const now = Date.now();
+      const locales = { he: 'he-IL', en: 'en-US', ru: 'ru-RU' };
+
+      document.getElementById('countAll').innerText = events.length;
+
+      let filtered = events.filter(e => {
+        if (currentFilter === 'upcoming' && e.timestamp < now) return false;
+        if (currentFilter === 'entry' && e.type !== 'entry') return false;
+        if (currentFilter === 'exit' && e.type !== 'exit') return false;
+
+        if (search) {
+          const title = getLocalizedTitle(e).toLowerCase();
+          const dayName = getLocalizedDayName(e).toLowerCase();
+          const rawDate = e.rawDate.toLowerCase();
+          const time = e.timeString.toLowerCase();
+          if (!title.includes(search) && !dayName.includes(search) && !rawDate.includes(search) && !time.includes(search)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="glass-card rounded-2xl p-8 text-center text-slate-400 border border-slate-800">
+            <i class="fa-regular fa-calendar-xmark text-3xl mb-2 text-slate-600"></i>
+            <div class="text-sm font-semibold">${t('noEventsFound')}</div>
+            <div class="text-xs text-slate-500 mt-1">${t('tryChangeFilter')}</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(e => {
+        const isPast = e.timestamp < now;
+        const alertTimestamp = e.timestamp - (appSettings.offsetMinutes * 60 * 1000);
+        const alertTimeStr = new Date(alertTimestamp).toLocaleTimeString(locales[currentLang] || 'he-IL', { hour: '2-digit', minute: '2-digit' });
+        const title = getLocalizedTitle(e);
+        const dayName = getLocalizedDayName(e);
+        const dateStr = formatLocalizedDate(e.timestamp);
+        const isAlertActive = (appSettings.alertMode === 'both' || appSettings.alertMode === e.type);
+
+        return `
+          <div class="glass-card rounded-xl p-3.5 border transition hover:border-slate-700 flex items-center justify-between gap-3 ${isPast ? 'opacity-50 border-slate-900 bg-slate-900/30' : 'border-slate-800 bg-slate-900/70'}">
+            
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg ${e.type === 'entry' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'} shrink-0">
+                ${e.type === 'entry' ? '🕯️' : '✨'}
+              </div>
+
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-bold text-white truncate">${title}</h4>
+                  ${isPast ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">${t('badgePast')}</span>` : ''}
+                </div>
+                <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span class="text-slate-300 font-medium">${dayName}</span>
+                  <span>•</span>
+                  <span>${dateStr}</span>
+                  <span>•</span>
+                  <span class="font-mono text-slate-300 font-bold">${e.timeString}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scheduled Alert Time Badge -->
+            ${isAlertActive ? `
+            <div class="text-end shrink-0 bg-slate-950/60 px-3 py-1.5 rounded-xl border border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-medium">${t('alertActiveBadge')}</div>
+              <div class="text-xs font-mono font-bold text-amber-400">${alertTimeStr}</div>
+            </div>
+            ` : `
+            <div class="text-end shrink-0 bg-slate-950/40 px-2.5 py-1.5 rounded-xl border border-slate-900 opacity-50">
+              <div class="text-[10px] text-slate-500 font-medium">🔕 ${t('alertDisabledBadge')}</div>
+              <div class="text-xs font-mono text-slate-600">--:--</div>
+            </div>
+            `}
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setFilter(filterType) {
+      currentFilter = filterType;
+      document.querySelectorAll('.filter-tab').forEach(t => {
+        t.classList.remove('bg-amber-500', 'text-slate-950', 'font-bold');
+        t.classList.add('text-slate-400');
+      });
+      const activeTab = document.getElementById('tab-' + filterType);
+      if (activeTab) {
+        activeTab.classList.add('bg-amber-500', 'text-slate-950', 'font-bold');
+        activeTab.classList.remove('text-slate-400');
+      }
+      renderEventsList();
+    }
+
+    // --- Pleasant Audio Chime ---
+    function playChimeSound() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        const notes = [523.25, 659.25, 783.99]; // C5 - E5 - G5
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + (idx * 0.18));
+          
+          gain.gain.setValueAtTime(0, ctx.currentTime + (idx * 0.18));
+          gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + (idx * 0.18) + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (idx * 0.18) + 0.7);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(ctx.currentTime + (idx * 0.18));
+          osc.stop(ctx.currentTime + (idx * 0.18) + 0.8);
+        });
+      } catch(e) {
+        console.warn('Audio play error:', e);
+      }
+    }
+
+    // --- Trigger Active Alerts ---
+    function triggerActiveAlert(eventObj, isExact) {
+      if (appSettings.alertMode === 'entry' && eventObj.type !== 'entry') return;
+      if (appSettings.alertMode === 'exit' && eventObj.type !== 'exit') return;
+
+      if (appSettings.sound) {
+        playChimeSound();
+      }
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const title = isExact ? `⏰ ${getLocalizedTitle(eventObj)}` : `🔔 ${getLocalizedTitle(eventObj)}`;
+        const body = `${getLocalizedDayName(eventObj)}, ${eventObj.timeString}`;
+        
+        try {
+          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(reg => {
+              reg.showNotification(title, {
+                body: body,
+                icon: 'icon.png',
+                vibrate: [200, 100, 200, 100, 200],
+                tag: eventObj.id + (isExact ? '_exact' : '_advance')
+              });
+            });
+          } else {
+            new Notification(title, {
+              body: body,
+              icon: 'icon.png'
+            });
+          }
+        } catch(e) {
+          console.warn('Notification error:', e);
+        }
+      }
+    }
+
+    function requestAndTestNotification() {
+      playChimeSound();
+
+      if (!('Notification' in window)) {
+        showToast(t('toastNotificationBlocked'), 'fa-triangle-exclamation');
+        return;
+      }
+
+      if (Notification.permission === 'granted') {
+        showTestNotification();
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            showTestNotification();
+          } else {
+            showToast(t('toastNotificationDenied'), 'fa-circle-exclamation');
+          }
+        });
+      } else {
+        showToast(t('toastNotificationBlocked'), 'fa-circle-exclamation');
+      }
+    }
+
+    function showTestNotification() {
+      const title = `🕯️ ${t('title')}`;
+      const body = `${t('toastTestNotificationSent')} (${appSettings.offsetMinutes} min)`;
+      
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification(title, {
+              body: body,
+              icon: 'icon.png',
+              vibrate: [300, 150, 300]
+            });
+          });
+        } else {
+          new Notification(title, { body: body, icon: 'icon.png' });
+        }
+        showToast(t('toastTestNotificationSent'));
+      } catch(e) {
+        showToast(t('toastTestNotificationSent'));
+      }
+    }
+
+    // --- Android Calendar Sync (.ICS Generator) ---
+    function exportToCalendarICS() {
+      if (events.length === 0) {
+        showToast(t('toastNoEvents'), 'fa-circle-exclamation');
+        return;
+      }
+
+      const offsetMinutes = appSettings.offsetMinutes || 15;
+      let icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Shabbat and Holidays Alerts//IL',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        `X-WR-CALNAME:${t('title')}`,
+        'X-WR-TIMEZONE:Asia/Jerusalem'
+      ];
+
+      events.forEach(e => {
+        const startDate = new Date(e.timestamp);
+        const endDate = new Date(e.timestamp + (60 * 60 * 1000));
+        
+        const formatICSDate = (d) => {
+          return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const title = getLocalizedTitle(e);
+        const day = getLocalizedDayName(e);
+
+        icsContent.push('BEGIN:VEVENT');
+        icsContent.push(`UID:${e.id}@shabbatalerts`);
+        icsContent.push(`DTSTAMP:${formatICSDate(new Date())}`);
+        icsContent.push(`DTSTART:${formatICSDate(startDate)}`);
+        icsContent.push(`DTEND:${formatICSDate(endDate)}`);
+        icsContent.push(`SUMMARY:${title}`);
+        icsContent.push(`DESCRIPTION:${title} - ${day} (${e.timeString})`);
+        
+        const isAlertActive = (appSettings.alertMode === 'both' || appSettings.alertMode === e.type);
+        if (isAlertActive) {
+          if (offsetMinutes > 0) {
+            icsContent.push('BEGIN:VALARM');
+            icsContent.push('ACTION:AUDIO');
+            icsContent.push(`TRIGGER:-PT${offsetMinutes}M`);
+            icsContent.push(`DESCRIPTION:${title} in ${offsetMinutes} minutes`);
+            icsContent.push('END:VALARM');
+          }
+
+          if (appSettings.doubleAlert || offsetMinutes === 0) {
+            icsContent.push('BEGIN:VALARM');
+            icsContent.push('ACTION:AUDIO');
+            icsContent.push('TRIGGER:PT0M');
+            icsContent.push(`DESCRIPTION:${title}`);
+            icsContent.push('END:VALARM');
+          }
+        }
+
+        icsContent.push('END:VEVENT');
+      });
+
+      icsContent.push('END:VCALENDAR');
+
+      const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'shabbat_holidays_schedule.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast(t('toastCalendarExported'), 'fa-calendar-check');
+      toggleHelpModal(true);
+    }
+
+    // Android Battery Settings Helper
+    function handleOpenBatterySettings(e) {
+      if (!/Android/i.test(navigator.userAgent)) {
+        e.preventDefault();
+        showToast(currentLang === 'he' ? 'קישור זה מיועד למכשירי אנדרואיד' : 'This link is for Android devices', 'fa-mobile-screen');
+        return;
+      }
+      setTimeout(() => {
+        showToast(currentLang === 'he' ? 'מעביר להגדרות הסוללה במכשיר...' : 'Opening Battery Settings...', 'fa-bolt');
+      }, 200);
+    }
+
+    // Modal helpers
+    function toggleSettingsModal(show) {
+      document.getElementById('settingsModal').classList.toggle('hidden', !show);
+    }
+    function toggleHelpModal(show) {
+      document.getElementById('helpModal').classList.toggle('hidden', !show);
+    }
+
+    // Toast
+    function showToast(msg, icon = 'fa-check') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').innerText = msg;
+      document.getElementById('toastIcon').className = `fa-solid ${icon}`;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 3500);
+    }
+
+    // Start immediately
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
