@@ -1,11 +1,12 @@
-const CACHE_NAME = 'excel-alerts-v3';
+const CACHE_NAME = 'excel-alerts-v4';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './locales.js',
   './schedule_data.js',
-  './shabbat_holidays_schedule.csv'
+  './shabbat_holidays_schedule.csv',
+  './candle-badge.png'
 ];
 
 self.addEventListener('install', (event) => {

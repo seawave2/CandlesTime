@@ -69,6 +69,13 @@ var I18N = {
     fontSizeLarge: 'גדול',
     fontSizeXLarge: 'גדול מאוד',
 
+    // Alarm Modal
+    alarmModalTitle: 'התראת מועד פעילה!',
+    btnDismissAlarm: 'כיבוי התראה',
+    alarmAutoDismissNote: 'ההתראה תכבה אוטומטית בעוד {n} שניות',
+    advanceNoticePersistentBody: '🕯️ מתכוננים: {title} בשעה {time} ({day})',
+    exactNoticePersistentBody: '🕯️ כעת: {title} בשעה {time}',
+
     // Battery & Samsung Optimization
     batteryOptTitle: 'מניעת סגירת האפליקציה (Android / Samsung)',
     batteryOptDesc: 'כדי שההתראות יצלצלו תמיד ברקע גם כשהמסך כבוי:',
@@ -182,6 +189,13 @@ var I18N = {
     fontSizeLarge: 'Large',
     fontSizeXLarge: 'Extra Large',
 
+    // Alarm Modal
+    alarmModalTitle: 'Alert Triggered!',
+    btnDismissAlarm: 'Dismiss Alert',
+    alarmAutoDismissNote: 'Will automatically turn off in {n}s',
+    advanceNoticePersistentBody: '🕯️ Preparing: {title} at {time} ({day})',
+    exactNoticePersistentBody: '🕯️ Now: {title} at {time}',
+
     // Battery & Samsung Optimization
     batteryOptTitle: 'Prevent App Sleep (Android / Samsung)',
     batteryOptDesc: 'To ensure alerts always ring in background when screen is off:',
@@ -294,6 +308,13 @@ var I18N = {
     fontSizeNormal: 'Обычный',
     fontSizeLarge: 'Большой',
     fontSizeXLarge: 'Очень большой',
+
+    // Alarm Modal
+    alarmModalTitle: 'Оповещение активно!',
+    btnDismissAlarm: 'Отключить сигнал',
+    alarmAutoDismissNote: 'Сигнал отключится через {n} сек',
+    advanceNoticePersistentBody: '🕯️ Подготовка: {title} в {time} ({day})',
+    exactNoticePersistentBody: '🕯️ Сейчас: {title} в {time}',
 
     // Battery & Samsung Optimization
     batteryOptTitle: 'Предотвращение закрытия (Android / Samsung)',

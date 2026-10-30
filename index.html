@@ -293,11 +293,21 @@
         </div>
       </div>
 
-      <!-- Footer Button -->
-      <div class="pt-1 flex items-center justify-end">
+      <!-- Footer Button & Credits -->
+      <div class="pt-1.5 flex flex-col gap-2">
         <button onclick="toggleSettingsModal(false)" data-i18n="btnSaveClose" class="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition active:scale-95">
           שמור וסגור
         </button>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-800/60 px-1">
+          <a href="mailto:seawave2@gmail.com?subject=Shabbat%20Alerts%20Feedback" 
+             class="hover:text-amber-400 font-medium tracking-wide transition-colors flex items-center gap-1 group"
+             title="שלח משוב / Send feedback">
+            <span>&copy; made by seawave</span>
+            <i class="fa-regular fa-envelope text-[10px] opacity-70 group-hover:opacity-100"></i>
+          </a>
+          <span id="appVersionDisplay" class="font-mono text-slate-400 font-semibold tracking-wider">v1.2</span>
+        </div>
       </div>
     </div>
   </div>
@@ -367,6 +377,31 @@
     </div>
   </div>
 
+  <!-- Active Alarm Modal (Plays every 5s until dismissed or 60s timeout) -->
+  <div id="alarmModal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-gradient-to-b from-slate-900 to-amber-950/40 border-2 border-amber-500 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center flex flex-col items-center gap-4 animate-bounce-slow">
+      <div class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl animate-pulse">
+        🔔
+      </div>
+      <div>
+        <span data-i18n="alarmModalTitle" class="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1">התראת מועד פעילה!</span>
+        <h3 id="alarmEventTitle" class="text-xl font-black text-white">כניסת שבת</h3>
+        <p id="alarmEventDetails" class="text-sm text-slate-300 font-medium mt-1">יום שישי, 17:28</p>
+      </div>
+
+      <div class="w-full pt-2">
+        <button onclick="dismissActiveAlarm()" class="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-base shadow-xl flex items-center justify-center gap-2 transition">
+          <i class="fa-solid fa-bell-slash text-lg"></i>
+          <span data-i18n="btnDismissAlarm">כיבוי התראה</span>
+        </button>
+      </div>
+
+      <p id="alarmAutoDismissCountdown" class="text-[11px] text-slate-400 font-medium">
+        ההתראה תכבה אוטומטית בעוד 60 שניות
+      </p>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-semibold shadow-2xl transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
     <i id="toastIcon" class="fa-solid fa-check"></i>
@@ -379,6 +414,11 @@
     let events = (typeof FIXED_SCHEDULE !== 'undefined') ? FIXED_SCHEDULE : [];
     let currentFilter = 'upcoming';
     let currentLang = 'he';
+    let triggeredAlerts = new Set(); // Prevent re-triggering within the same minute
+    let activeAlarmInterval = null;
+    let activeAlarmTimeout = null;
+    let alarmRemainingSeconds = 60;
+    let alarmCountdownTimer = null;
     let appSettings = {
       lang: 'he',
       alertMode: 'entry', // 'entry' (default) | 'both' | 'exit'
@@ -504,11 +544,30 @@
       return d.toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric' });
     }
 
+    // Detect phone/device default language ('he', 'en', 'ru') on first use
+    function detectDeviceLanguage() {
+      try {
+        const navLangs = (navigator.languages && navigator.languages.length)
+          ? navigator.languages
+          : [navigator.language || navigator.userLanguage || navigator.browserLanguage || ''];
+        for (const lang of navLangs) {
+          if (!lang || typeof lang !== 'string') continue;
+          const code = lang.toLowerCase().split('-')[0].split('_')[0].trim();
+          if (code === 'he' || code === 'iw') return 'he';
+          if (code === 'ru') return 'ru';
+          if (code === 'en') return 'en';
+        }
+      } catch (e) {}
+      return 'he';
+    }
+
     // --- Storage & Settings ---
     function loadSettings() {
       const savedLang = localStorage.getItem('shabbat_app_lang');
       if (savedLang && I18N[savedLang]) {
         appSettings.lang = savedLang;
+      } else {
+        appSettings.lang = detectDeviceLanguage();
       }
       const saved = localStorage.getItem('shabbat_app_settings');
       if (saved) {
@@ -677,9 +736,14 @@
       setCountdown(days, hours, minutes);
 
       // Check alert trigger right now
-      if (Math.abs(alertTimestamp - now) < 1500) {
+      const alertKeyAdvance = nextEvt.id + '_adv';
+      const alertKeyExact = nextEvt.id + '_ext';
+
+      if (Math.abs(alertTimestamp - now) < 2000 && !triggeredAlerts.has(alertKeyAdvance)) {
+        triggeredAlerts.add(alertKeyAdvance);
         triggerActiveAlert(nextEvt, false);
-      } else if (appSettings.doubleAlert && Math.abs(nextEvt.timestamp - now) < 1500) {
+      } else if (appSettings.doubleAlert && Math.abs(nextEvt.timestamp - now) < 2000 && !triggeredAlerts.has(alertKeyExact)) {
+        triggeredAlerts.add(alertKeyExact);
         triggerActiveAlert(nextEvt, true);
       }
     }
@@ -804,8 +868,9 @@
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, ctx.currentTime + (idx * 0.18));
           
+          // Boosted volume by 40% (peak gain increased from 0.3 to 0.42)
           gain.gain.setValueAtTime(0, ctx.currentTime + (idx * 0.18));
-          gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + (idx * 0.18) + 0.03);
+          gain.gain.linearRampToValueAtTime(0.42, ctx.currentTime + (idx * 0.18) + 0.03);
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (idx * 0.18) + 0.7);
 
           osc.connect(gain);
@@ -819,18 +884,18 @@
       }
     }
 
-    // --- Trigger Active Alerts ---
+    // --- Trigger Active Alerts (Chimes every 3s until user dismisses or 60s timeout) ---
     function triggerActiveAlert(eventObj, isExact) {
       if (appSettings.alertMode === 'entry' && eventObj.type !== 'entry') return;
       if (appSettings.alertMode === 'exit' && eventObj.type !== 'exit') return;
 
-      if (appSettings.sound) {
-        playChimeSound();
-      }
+      startAlarmLoop(eventObj, isExact);
 
       if ('Notification' in window && Notification.permission === 'granted') {
-        const title = isExact ? `⏰ ${getLocalizedTitle(eventObj)}` : `🔔 ${getLocalizedTitle(eventObj)}`;
-        const body = `${getLocalizedDayName(eventObj)}, ${eventObj.timeString}`;
+        const title = isExact ? `⏰ ${getLocalizedTitle(eventObj)}` : `🕯️ ${getLocalizedTitle(eventObj)}`;
+        const body = isExact 
+          ? t('exactNoticePersistentBody', { title: getLocalizedTitle(eventObj), time: eventObj.timeString })
+          : t('advanceNoticePersistentBody', { title: getLocalizedTitle(eventObj), time: eventObj.timeString, day: getLocalizedDayName(eventObj) });
         
         try {
           if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -838,14 +903,20 @@
               reg.showNotification(title, {
                 body: body,
                 icon: 'icon.png',
-                vibrate: [200, 100, 200, 100, 200],
-                tag: eventObj.id + (isExact ? '_exact' : '_advance')
+                badge: 'candle-badge.png', // Candle silhouette icon in Android status bar
+                vibrate: [300, 150, 300, 150, 300],
+                tag: 'shabbat_candle_alert', // Persistent tag so advance notice stays and transitions cleanly
+                renotify: true,
+                requireInteraction: true // Keeps notification persistent in status bar & lock screen
               });
             });
           } else {
             new Notification(title, {
               body: body,
-              icon: 'icon.png'
+              icon: 'icon.png',
+              badge: 'candle-badge.png',
+              tag: 'shabbat_candle_alert',
+              requireInteraction: true
             });
           }
         } catch(e) {
@@ -854,8 +925,95 @@
       }
     }
 
+    function startAlarmLoop(eventObj, isExact) {
+      stopAlarmLoop(); // Clear any existing alarm
+
+      const modal = document.getElementById('alarmModal');
+      const titleEl = document.getElementById('alarmEventTitle');
+      const detailsEl = document.getElementById('alarmEventDetails');
+      const countdownEl = document.getElementById('alarmAutoDismissCountdown');
+
+      if (titleEl) {
+        titleEl.innerText = (isExact ? '⏰ ' : '🔔 ') + getLocalizedTitle(eventObj);
+      }
+      if (detailsEl) {
+        detailsEl.innerText = `${getLocalizedDayName(eventObj)}, ${formatLocalizedDate(eventObj.timestamp)} (${eventObj.timeString})`;
+      }
+
+      alarmRemainingSeconds = 60;
+      if (countdownEl) {
+        countdownEl.innerText = t('alarmAutoDismissNote', { n: alarmRemainingSeconds });
+      }
+
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+
+      // First chime immediately if sound is enabled
+      if (appSettings.sound) {
+        playChimeSound();
+        if ('vibrate' in navigator) navigator.vibrate([300, 150, 300]);
+      }
+
+      // Repeat chime every 3 seconds (was 5s)
+      activeAlarmInterval = setInterval(() => {
+        if (appSettings.sound) {
+          playChimeSound();
+          if ('vibrate' in navigator) navigator.vibrate([300, 150, 300]);
+        }
+      }, 3000);
+
+      // Countdown ticker per second
+      alarmCountdownTimer = setInterval(() => {
+        alarmRemainingSeconds--;
+        if (countdownEl) {
+          countdownEl.innerText = t('alarmAutoDismissNote', { n: Math.max(0, alarmRemainingSeconds) });
+        }
+        if (alarmRemainingSeconds <= 0) {
+          dismissActiveAlarm();
+        }
+      }, 1000);
+
+      // Hard safety timeout at 60s
+      activeAlarmTimeout = setTimeout(() => {
+        dismissActiveAlarm();
+      }, 60000);
+    }
+
+    function stopAlarmLoop() {
+      if (activeAlarmInterval) {
+        clearInterval(activeAlarmInterval);
+        activeAlarmInterval = null;
+      }
+      if (alarmCountdownTimer) {
+        clearInterval(alarmCountdownTimer);
+        alarmCountdownTimer = null;
+      }
+      if (activeAlarmTimeout) {
+        clearTimeout(activeAlarmTimeout);
+        activeAlarmTimeout = null;
+      }
+    }
+
+    function dismissActiveAlarm() {
+      stopAlarmLoop();
+      const modal = document.getElementById('alarmModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
     function requestAndTestNotification() {
-      playChimeSound();
+      // Trigger full alarm test (chimes every 3s until dismissed or 60s timeout)
+      const mockEvent = {
+        id: 'test_event',
+        type: 'entry',
+        subType: 'shabbat',
+        timestamp: Date.now(),
+        timeString: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        dayEn: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
+      };
+      startAlarmLoop(mockEvent, false);
 
       if (!('Notification' in window)) {
         showToast(t('toastNotificationBlocked'), 'fa-triangle-exclamation');
@@ -879,7 +1037,11 @@
 
     function showTestNotification() {
       const title = `🕯️ ${t('title')}`;
-      const body = `${t('toastTestNotificationSent')} (${appSettings.offsetMinutes} min)`;
+      const body = t('advanceNoticePersistentBody', { 
+        title: t('shabbatEntry'), 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        day: t('daysNames').Friday 
+      });
       
       try {
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -887,11 +1049,21 @@
             reg.showNotification(title, {
               body: body,
               icon: 'icon.png',
-              vibrate: [300, 150, 300]
+              badge: 'candle-badge.png',
+              vibrate: [300, 150, 300],
+              tag: 'shabbat_candle_alert',
+              renotify: true,
+              requireInteraction: true
             });
           });
         } else {
-          new Notification(title, { body: body, icon: 'icon.png' });
+          new Notification(title, { 
+            body: body, 
+            icon: 'icon.png',
+            badge: 'candle-badge.png',
+            tag: 'shabbat_candle_alert',
+            requireInteraction: true
+          });
         }
         showToast(t('toastTestNotificationSent'));
       } catch(e) {
